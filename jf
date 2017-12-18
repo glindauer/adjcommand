@@ -1,0 +1,81 @@
+#!/bin/bash
+ 
+if [ $# -lt 3 ]
+then
+	echo 'USAGE:'
+	echo '	jf CMD FILENAME bracket[ADJUSTMENT].suffix'
+	echo 'where jf stands for "adJust Filename" '
+	echo '	CMD is a command such as "cp" "mv", etc.'
+	echo '	FILENAME is the name of the existing file'
+	echo '	ADJUSTMENT is a parameter expansion expression'
+	echo 'which will be used against FILENAME  to obtain the destination'
+	echo 'filename in which the result of running CMD upon FILENAME will'
+       	echo 'be placed. There can be multiple adjustment parameters, where'
+	echo 'each ADJUSTMENT is surrounded by brackets. Examples:'
+	echo '	/find/replace	to find and replace'
+	echo '	:offset		to start at zero based offset'
+	echo '	:offset:length	as above, taking only length chars'
+	echo "	'#prefix'		strips off prefix"
+	echo '	%suffix		strips off suffix'
+	echo '	^^		changes to UPPERCASE'
+	echo '	,,		changes to lowercase'
+	echo 'So, "jf cp redlight [%.exe] [/red/green].bat [^^]"'
+	echo 'will perform "cp redlight GREENLIGHT.BAT"'
+	echo 
+	echo '(For details regarding formatting the "ADJUSTMENT"'
+	echo 'string, see parameter expansion section of '
+	echo 'bash documentation.)'
+else
+	# $1 is the source, and $3 is the adjustment-- for example,
+	# if adjustment is /findstring/replacestring/ like
+	# '/red/green/' and $2 is "redlight", then
+	# FIX_TEMPLATE will be the result of ${2/red/green}
+	# and FIX_FILE will be "greenlight"
+
+	# Save current parameters
+	CMD=$1
+	SRC=$2
+	# initial destination is same as source
+	DEST=$SRC
+	shift 2
+
+	# Use the third (now $1) and each following parameter,
+	# modify DEST.
+	while [ $# -gt 0 ] 
+	do
+		# parameter format is PREFIX[ADJUSTMENT]SUFFIX.
+		# Save PREFIX and SUFFIX
+		ADJ_PREFIX=${1%%[*}
+		ADJ_SUFFIX=${1##*]}
+
+		# account for parameter format omitting PREFIX, SUFFIX, or both
+		if [ "$ADJ_PREFIX" == "$1" ]
+		then
+			unset ADJ_PREFIX
+		fi
+		if [ "$ADJ_SUFFIX" == "$1" ]
+		then
+			unset ADJ_SUFFIX
+		fi
+
+		# Now strip off the PREFIX and SUFFIX
+		ADJ_PLUS=${1##*[}
+		ADJUSTMENT=${ADJ_PLUS%%]*}
+
+		# Fix template is formatted as bash expects a
+		#  word representing a parameter expansion
+		FIX_TEMPLATE='${DEST'$ADJUSTMENT'}'
+
+		# Use eval to carry out the parameter expansion
+		FIX_FILE=$(eval echo $FIX_TEMPLATE)
+
+		# Reset DEST to include prefix, suffix, and expansion
+		DEST=$ADJ_PREFIX$FIX_FILE$ADJ_SUFFIX 
+	
+		# on to the next parameter in our adjustment list
+		shift
+	done
+	echo $CMD $SRC $DEST 
+	# carry out the command.
+	$CMD $SRC $DEST
+fi

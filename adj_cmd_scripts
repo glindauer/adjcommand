@@ -1,0 +1,121 @@
+#!/bin/bash
+
+function jj () {
+	declare -l functionname=${FUNCNAME[0]}
+#	set -xv
+	# declare -a param
+	#echo Before `fc -ln -0` > /dev/stderr
+	#fc -ln -0 > /dev/stderr
+	local iparray=0, iFunc=0, iNum=0
+	declare -al parray
+
+	for param in `fc -ln -0`
+	do
+		# echo iNum=$iNum, iFunc=$iFunc > /dev/stderr
+		parray[iNum]=$param
+		# First handles invocation by `FUNCNAME, second by
+		#	$(FUNCNAME -- if another function has similar
+		#	name possible error from picking wrong function...
+		if [[ $param =~ \`{0,1}$functionname || \
+			$param =~ (\$\(){0,1}$functionname ]]
+		then
+		#	echo param[$iNum] is $param >/dev/stderr
+			iFunc=$iNum
+			funcdelim=${param:0:2}
+		fi
+		(( iNum++ ))
+	done
+	(( iNum-- ))
+
+	if [ $iFunc -lt 1 ]
+	then
+		echo 'USAGE:'
+		echo '	CMD FILENAME \`$functionname bracket[ADJUSTMENT].suffix\`'
+		echo 'where jp stands for "adJust Parameter" '
+		echo '	CMD is a command such as "cp" "mv", etc.'
+		echo '	FILENAME is the name of the existing file'
+		echo '	ADJUSTMENT is a parameter expansion expression'
+		echo 'which will be used against FILENAME  to obtain the destination'
+		echo 'filename in which the result of running CMD upon FILENAME will'
+	       	echo 'be placed. There can be multiple adjustment parameters, where'
+		echo 'each ADJUSTMENT is surrounded by brackets. Examples:'
+		echo '	/find/replace	to find and replace'
+		echo '	:offset		to start at zero based offset'
+		echo '	:offset:length	as above, taking only length chars'
+		echo "	'#prefix'		strips off prefix"
+		echo '	%suffix		strips off suffix'
+		echo '	^^		changes to UPPERCASE'
+		echo '	,,		changes to lowercase'
+		echo 'So, "jf cp redlight [%.exe] [/red/green].bat [^^]"'
+		echo 'will perform "cp redlight GREENLIGHT.BAT"'
+		echo 
+		echo '(For details regarding formatting the "ADJUSTMENT"'
+		echo 'string, see parameter expansion section of '
+		echo 'bash documentation.)'
+	else
+		(( iSrc=iFunc - 1 ))
+
+		# $1 is the source, and $3 is the adjustment-- for example,
+		# if adjustment is /findstring/replacestring/ like
+		# '/red/green/' and $2 is "redlight", then
+		# FIX_TEMPLATE will be the result of ${2/red/green}
+		# and FIX_FILE will be "greenlight"
+	
+		# Save current parameters
+		CMD=${parray[0]}
+		SRC=${parray[iSrc]}
+		# initial destination is same as source
+		DEST=$SRC
+	
+		(( iSrc=iSrc+2 )) # skip over the call to this function
+		# Use the third (now $1) and each following parameter,
+		# modify DEST.
+		while [ $iSrc -le $iNum ] 
+		do
+			ADJ_CURR=${parray[iSrc]}
+			if [[ $iSrc -eq $iNum ]]
+			then
+				# the last parameter has the end delimiter
+				# for the command substitution-- either a
+				# grave's quote or end parenthesis-- strip
+				# it off so ADJ_SUFFIX doesn't have to deal
+				# with it
+		 		ADJ_CURR=${ADJ_CURR:0:-1}
+			fi
+			# parameter format is PREFIX[ADJUSTMENT]SUFFIX.
+			# Save PREFIX and SUFFIX
+			ADJ_PREFIX=${ADJ_CURR%%[*}
+			ADJ_SUFFIX=${ADJ_CURR##*]}
+	
+			# account for parameter format omitting PREFIX, SUFFIX, or both
+			if [ "$ADJ_PREFIX" == "$ADJ_CURR" ]
+			then
+				unset ADJ_PREFIX
+			fi
+			if [ "$ADJ_SUFFIX" == "$ADJ_CURR" ]
+			then
+				unset ADJ_SUFFIX
+			fi
+	
+			# Now strip off the PREFIX and SUFFIX
+			ADJ_PLUS=${ADJ_CURR##*[}
+			ADJUSTMENT=${ADJ_PLUS%%]*}
+	
+			# Fix template is formatted as bash expects a
+			#  word representing a parameter expansion
+			FIX_TEMPLATE='${DEST'$ADJUSTMENT'}'
+	
+			# Use eval to carry out the parameter expansion
+			FIX_FILE=$(eval echo $FIX_TEMPLATE)
+	
+			# Reset DEST to include prefix, suffix, and expansion
+			DEST=$ADJ_PREFIX$FIX_FILE$ADJ_SUFFIX 
+		
+			# on to the next parameter in our adjustment list
+			(( iSrc++ ))
+		done
+		echo $CMD $SRC $DEST >/dev/stderr
+		echo $DEST
+		# carry out the command.
+	fi
+}
