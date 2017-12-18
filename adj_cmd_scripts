@@ -73,44 +73,52 @@ function jj () {
 		while [ $iSrc -le $iNum ] 
 		do
 			ADJ_CURR=${parray[iSrc]}
-			if [[ $iSrc -eq $iNum ]]
+			# check for ;, |, &&, and other list terminators
+			if [[ $ADJ_CURR =~ ^[\;\|\&] ]]
 			then
-				# the last parameter has the end delimiter
-				# for the command substitution-- either a
-				# grave's quote or end parenthesis-- strip
-				# it off so ADJ_SUFFIX doesn't have to deal
-				# with it
-		 		ADJ_CURR=${ADJ_CURR:0:-1}
-			fi
-			# parameter format is PREFIX[ADJUSTMENT]SUFFIX.
-			# Save PREFIX and SUFFIX
-			ADJ_PREFIX=${ADJ_CURR%%[*}
-			ADJ_SUFFIX=${ADJ_CURR##*]}
-	
-			# account for parameter format omitting PREFIX, SUFFIX, or both
-			if [ "$ADJ_PREFIX" == "$ADJ_CURR" ]
-			then
-				unset ADJ_PREFIX
-			fi
-			if [ "$ADJ_SUFFIX" == "$ADJ_CURR" ]
-			then
-				unset ADJ_SUFFIX
-			fi
-	
-			# Now strip off the PREFIX and SUFFIX
-			ADJ_PLUS=${ADJ_CURR##*[}
-			ADJUSTMENT=${ADJ_PLUS%%]*}
-	
-			# Fix template is formatted as bash expects a
-			#  word representing a parameter expansion
-			FIX_TEMPLATE='${DEST'$ADJUSTMENT'}'
-	
-			# Use eval to carry out the parameter expansion
-			FIX_FILE=$(eval echo $FIX_TEMPLATE)
-	
-			# Reset DEST to include prefix, suffix, and expansion
-			DEST=$ADJ_PREFIX$FIX_FILE$ADJ_SUFFIX 
+				# terminate loop
+				iSrc=$iNum
+				# strip command substition end delimiter from DEST
+				DEST=${DEST:0:-1}
+			else
+				if [[ $iSrc -eq $iNum ]]
+				then
+					# the last parameter has the end delimiter
+					# for the command substitution-- either a
+					# grave's quote or end parenthesis-- strip
+					# it off so ADJ_SUFFIX doesn't have to deal
+					# with it
+			 		ADJ_CURR=${ADJ_CURR:0:-1}
+				fi
+				# parameter format is PREFIX[ADJUSTMENT]SUFFIX.
+				# Save PREFIX and SUFFIX
+				ADJ_PREFIX=${ADJ_CURR%%[*}
+				ADJ_SUFFIX=${ADJ_CURR##*]}
 		
+				# account for parameter format omitting PREFIX, SUFFIX, or both
+				if [ "$ADJ_PREFIX" == "$ADJ_CURR" ]
+				then
+					unset ADJ_PREFIX
+				fi
+				if [ "$ADJ_SUFFIX" == "$ADJ_CURR" ]
+				then
+					unset ADJ_SUFFIX
+				fi
+		
+				# Now strip off the PREFIX and SUFFIX
+				ADJ_PLUS=${ADJ_CURR##*[}
+				ADJUSTMENT=${ADJ_PLUS%%]*}
+		
+				# Fix template is formatted as bash expects a
+				#  word representing a parameter expansion
+				FIX_TEMPLATE='${DEST'$ADJUSTMENT'}'
+		
+				# Use eval to carry out the parameter expansion
+				FIX_FILE=$(eval echo $FIX_TEMPLATE)
+		
+				# Reset DEST to include prefix, suffix, and expansion
+				DEST=$ADJ_PREFIX$FIX_FILE$ADJ_SUFFIX 
+			fi
 			# on to the next parameter in our adjustment list
 			(( iSrc++ ))
 		done
